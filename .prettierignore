@@ -1,6 +1,8 @@
 node_modules
 dist
 notes
+docs
+coverage
 playwright-report
 test-results
 package-lock.json
