@@ -1,0 +1,18 @@
+# Local-only material, never pushed: conversation log, review docs site, editor/agent config
+notes/
+docs/
+.claude/
+
+# Dependencies and build output
+node_modules/
+dist/
+
+# Environment and local data
+.env
+server/uploads/
+.e2e-uploads/
+
+# Test output
+test-results/
+playwright-report/
+coverage/

@@ -1,0 +1,26 @@
+{
+  "name": "@nocap/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "seed": "tsx src/seed.ts"
+  },
+  "dependencies": {
+    "@nocap/shared": "*",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.3.0",
+    "mongoose": "^8.24.5",
+    "multer": "^2.4.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.3.0",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.3.1"
+  }
+}
