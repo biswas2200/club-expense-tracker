@@ -1,6 +1,6 @@
 {
   "name": "nocap",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "NoCap: transparent club expense tracker for Sparks Club",
   "type": "module",

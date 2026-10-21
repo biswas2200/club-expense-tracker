@@ -229,6 +229,19 @@ a {
   padding: 1.25rem 16px 4rem;
 }
 
+.pagefoot {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 1rem 16px 2rem;
+  border-top: 1px solid var(--carbon-wash);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+}
+
 .page-status {
   padding: 2rem 16px;
   text-align: center;

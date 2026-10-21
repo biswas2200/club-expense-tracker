@@ -1,0 +1,50 @@
+name: Bug report
+description: Something in NoCap doesn't work the way it should.
+title: '[Bug] '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. This tracker is public, so please leave out names, phone numbers,
+        UPI IDs, transaction IDs and screenshots of real payments. Describe the problem in
+        general terms instead (for example "a ₹1,200 cash entry" is fine).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you see? Paste any error message shown on screen.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open an event
+        2. Click Add entry
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: NoCap version
+      description: Filled in by the Report a bug link.
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      description: Filled in by the Report a bug link.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Role, browser and time. Filled in by the Report a bug link.
+      render: text

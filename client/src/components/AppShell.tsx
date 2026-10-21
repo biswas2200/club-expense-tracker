@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
+import { bugReportUrl } from '@nocap/shared';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { ROLE_LABEL } from '../format';
+
+// Bug reports go to the project's public issue tracker. Point VITE_BUG_TRACKER_URL at another
+// GitHub or Forgejo (Codeberg) repository to move them.
+const TRACKER_URL =
+  import.meta.env.VITE_BUG_TRACKER_URL ?? 'https://github.com/biswas2200/club-expense-tracker';
 
 /** Header and page frame for logged-in pages. Sends logged-out visitors to /login. */
 export function AppShell() {
@@ -64,6 +70,23 @@ export function AppShell() {
       <main className="page">
         <Outlet />
       </main>
+      <footer className="pagefoot">
+        <a
+          href={bugReportUrl({
+            trackerUrl: TRACKER_URL,
+            version: import.meta.env.VITE_APP_VERSION,
+            page: location.pathname,
+            role: member.role,
+            userAgent: navigator.userAgent,
+            now: new Date(),
+          })}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Report a bug
+        </a>
+        <span className="pagefoot-version">NoCap v{import.meta.env.VITE_APP_VERSION}</span>
+      </footer>
     </>
   );
 }
