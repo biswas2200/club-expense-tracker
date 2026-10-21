@@ -7,7 +7,13 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach } from 'vitest';
 import { createApp } from '../src/app';
 import { Member } from '../src/models/Member';
-import type { Role } from '@nocap/shared';
+import {
+  addPngText,
+  SAMPLE_PAYMENT_KEY,
+  type BotMessageDTO,
+  type Role,
+  type SamplePayment,
+} from '@nocap/shared';
 
 import { placeholderPng } from '../src/lib/placeholderPng';
 
@@ -115,6 +121,37 @@ export function postEntry(
   }
   if (proof) req.attach('proof', proof, { filename: 'shot.png', contentType: 'image/png' });
   return req;
+}
+
+export const GROUP_CHAT = 'group-sparks';
+export const dmOf = (person: { _id: unknown }) => `dm-${String(person._id)}`;
+
+/** A screenshot the mock parser can read, standing in for a real GPay or PhonePe one. */
+export function sampleShot(payment: Partial<SamplePayment>) {
+  return Buffer.from(addPngText(placeholderPng(), SAMPLE_PAYMENT_KEY, JSON.stringify(payment)));
+}
+
+/** Sends a message in the chat simulator. Returns the request so tests can assert on it. */
+export function chat(
+  agent: request.Agent,
+  chatId: string,
+  message: { text?: string; senderId?: unknown; image?: Buffer; imageType?: string },
+) {
+  const req = agent.post(`/api/sim/chats/${chatId}/messages`);
+  if (message.text !== undefined) req.field('text', message.text);
+  if (message.senderId) req.field('senderId', String(message.senderId));
+  if (message.image) {
+    req.attach('image', message.image, {
+      filename: 'shot.png',
+      contentType: message.imageType ?? 'image/png',
+    });
+  }
+  return req;
+}
+
+/** The text of the bot's last message in a thread. */
+export function lastBotText(thread: BotMessageDTO[]) {
+  return thread.filter((m) => m.from === 'bot').at(-1)?.text ?? '';
 }
 
 /** Confirms or disputes an entry; attaches a bill photo when one is given. */

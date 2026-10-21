@@ -3,9 +3,19 @@ import { unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { isValidObjectId, mongo, type Types } from 'mongoose';
 import { z } from 'zod';
-import { DIRECTIONS, formatPaise, MAX_PAISE, MODES, type EntryDTO } from '@nocap/shared';
+import {
+  DIRECTIONS,
+  formatPaise,
+  MAX_PAISE,
+  MODES,
+  type EntryDTO,
+  type EntrySource,
+} from '@nocap/shared';
+import { queueVerificationPing } from '../bot/pingQueue';
 import { detectProofType } from '../lib/fileType';
+import { normaliseTxnId } from '../lib/txnId';
 import { assertObjectId, HttpError, notFound } from '../lib/http';
+import { Event } from '../models/Event';
 import { LedgerEntry } from '../models/LedgerEntry';
 import { Member, type MemberDoc } from '../models/Member';
 import { describeEntry, recordAudit } from './audit';
@@ -34,13 +44,33 @@ export const entryFieldsSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD')
     .transform((s) => new Date(`${s}T00:00:00.000Z`))
     .refine((d) => !Number.isNaN(d.getTime()), 'Date is not valid'),
-  txnId: optionalText(64),
+  txnId: optionalText(64).transform((v) => (v ? normaliseTxnId(v) : undefined)),
   note: optionalText(500),
   correctsEntryId: optionalText(24),
   reason: optionalText(300),
   memberId: optionalText(24),
   paidByMemberId: optionalText(24),
 });
+
+/**
+ * The entry that already holds this UPI transaction ID, if any. Replaced and voided entries
+ * don't count, and neither does the entry being corrected (a correction may keep its ID).
+ */
+export async function findDuplicatePayment(txnId: string, except?: Types.ObjectId) {
+  const same = (await LedgerEntry.find({ txnId }).lean()) as StoredEntry[];
+  if (same.length === 0) return undefined;
+  const replaced = new Set(
+    (
+      await LedgerEntry.find(
+        { correctsEntryId: { $in: same.map((e) => e._id) } },
+        { correctsEntryId: 1 },
+      ).lean()
+    ).map((e) => String(e.correctsEntryId)),
+  );
+  return same.find(
+    (e) => e.amountPaise > 0 && !replaced.has(String(e._id)) && !(except && e._id.equals(except)),
+  );
+}
 
 /** Members and admins can pay or be paid; the faculty viewer only reads. */
 async function findClubMember(id: string | undefined) {
@@ -67,6 +97,9 @@ interface CreateEntryInput {
   file?: { buffer: Buffer };
   member: MemberDoc;
   uploadDir: string;
+  /** A proof already in the upload folder: a screenshot sent to the bot. */
+  savedProof?: string;
+  source?: EntrySource;
 }
 
 /**
@@ -79,6 +112,8 @@ export async function createEntry({
   file,
   member: actor,
   uploadDir,
+  savedProof,
+  source = 'web',
 }: CreateEntryInput): Promise<EntryDTO> {
   const fields = entryFieldsSchema.parse(body);
 
@@ -109,10 +144,21 @@ export async function createEntry({
       );
     }
   } else {
-    if (!file && fields.mode === 'upi') {
+    if (!file && !savedProof && fields.mode === 'upi') {
       throw new HttpError(400, 'A proof is required for UPI: attach the payment screenshot');
     }
     if (fields.amountPaise === 0) throw new HttpError(400, 'Amount must be more than ₹0');
+  }
+
+  if (fields.txnId) {
+    const duplicate = await findDuplicatePayment(fields.txnId, target?._id);
+    if (duplicate) {
+      const event = await Event.findById(duplicate.eventId, { name: 1 }).lean();
+      throw new HttpError(
+        409,
+        `This UPI payment (ref ${fields.txnId}) is already recorded: ${describeEntry(duplicate)} in ${event?.name ?? 'another event'}`,
+      );
+    }
   }
 
   const savedFile = file ? await saveProof(file, uploadDir) : undefined;
@@ -123,11 +169,12 @@ export async function createEntry({
       memberId: member?._id,
       paidByMemberId: paidBy?._id,
       eventId,
-      proofPath: savedFile ?? target?.proofPath,
+      proofPath: savedFile ?? savedProof ?? target?.proofPath,
       createdBy: actor._id,
+      source,
     });
 
-    let summary = `Recorded ${describeEntry(entry)} by ${entry.mode === 'upi' ? 'UPI' : 'cash'}`;
+    let summary = `Recorded ${describeEntry(entry)} by ${entry.mode === 'upi' ? 'UPI' : 'cash'}${source === 'chat' ? ', via chat' : ''}`;
     if (target) {
       summary =
         entry.amountPaise === 0
@@ -141,6 +188,7 @@ export async function createEntry({
       entryId: entry._id,
       summary,
     });
+    await queueVerificationPing(entry.toObject() as StoredEntry, target);
     return entryDTO(eventId, entry._id);
   } catch (err) {
     if (savedFile) await unlink(path.join(uploadDir, savedFile)).catch(() => {});

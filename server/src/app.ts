@@ -9,12 +9,17 @@ import { eventsRouter } from './routes/events';
 import { meRouter } from './routes/me';
 import { membersRouter } from './routes/members';
 import { proofsRouter } from './routes/proofs';
+import { simulatorRouter } from './routes/simulator';
+import { mockScreenshotParser, type ScreenshotParser } from './bot/parser';
 
 export interface AppOptions {
   uploadDir: string;
   sessionSecret: string;
+  /** Dev-only tools: pick-a-member login and the chat simulator. Off in production. */
   devLogin: boolean;
   secureCookies?: boolean;
+  /** Reads payment screenshots sent to the bot; the mock until the AI adapter (v0.5). */
+  screenshotParser?: ScreenshotParser;
 }
 
 /** Builds the Express app without listening, so tests can drive it with supertest. */
@@ -39,6 +44,15 @@ export function createApp(opts: AppOptions) {
   app.use('/api/me', meRouter());
   app.use('/api/activity', activityRouter());
   app.use('/api/proofs', proofsRouter(opts));
+  if (opts.devLogin) {
+    app.use(
+      '/api/sim',
+      simulatorRouter({
+        uploadDir: opts.uploadDir,
+        parser: opts.screenshotParser ?? mockScreenshotParser,
+      }),
+    );
+  }
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Not found' });
   });

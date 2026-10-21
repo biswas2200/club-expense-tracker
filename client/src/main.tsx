@@ -10,6 +10,7 @@ import { ActivityPage } from './pages/ActivityPage';
 import { EventsPage } from './pages/EventsPage';
 import { LoginPage } from './pages/LoginPage';
 import { MyPaymentsPage } from './pages/MyPaymentsPage';
+import { SimulatorPage } from './pages/SimulatorPage';
 
 function NotFound() {
   return (
@@ -31,6 +32,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="events/:eventId" element={<EventPage />} />
             <Route path="me/payments" element={<MyPaymentsPage />} />
             <Route path="activity" element={<ActivityPage />} />
+            {import.meta.env.DEV && <Route path="simulator" element={<SimulatorPage />} />}
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

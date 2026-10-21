@@ -132,6 +132,7 @@ export function toEntryDTO(
     createdAt: entry.createdAt.toISOString(),
     correctsEntryId: entry.correctsEntryId ? String(entry.correctsEntryId) : undefined,
     reason: entry.reason ?? undefined,
+    source: entry.source ?? 'web',
     isVoid: Boolean(entry.correctsEntryId) && entry.amountPaise === 0,
     ...statusInfo,
     verification: {

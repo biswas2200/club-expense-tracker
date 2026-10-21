@@ -7,6 +7,8 @@ import type {
   FeesDTO,
   MemberDTO,
   MyPaymentDTO,
+  SimChatDTO,
+  BotMessageDTO,
 } from '@nocap/shared';
 
 export class ApiError extends Error {
@@ -72,4 +74,14 @@ export const api = {
   history: (entryId: string) => request<EntryDTO[]>(`/api/entries/${entryId}/history`),
   verify: (entryId: string, form: FormData) =>
     request<EntryDTO>(`/api/entries/${entryId}/verifications`, { method: 'POST', body: form }),
+
+  /** The chat simulator (dev only). */
+  simChats: () => request<SimChatDTO[]>('/api/sim/chats'),
+  simThread: (chatId: string) =>
+    request<BotMessageDTO[]>(`/api/sim/chats/${encodeURIComponent(chatId)}/messages`),
+  simSend: (chatId: string, form: FormData) =>
+    request<BotMessageDTO[]>(`/api/sim/chats/${encodeURIComponent(chatId)}/messages`, {
+      method: 'POST',
+      body: form,
+    }),
 };

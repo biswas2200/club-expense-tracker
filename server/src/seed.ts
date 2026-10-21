@@ -37,6 +37,9 @@ export async function seed() {
     'verifications',
     'cash_counts',
     'audit_log',
+    'bot_messages',
+    'bot_chats',
+    'bot_pings',
   ]) {
     await db.collection(name).deleteMany({});
   }

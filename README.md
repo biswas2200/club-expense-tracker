@@ -4,7 +4,7 @@ No cap, where every rupee went. A transparent expense tracker for Sparks Club (N
 collected or spent is recorded with proof, visible to members, and can never be silently edited
 or deleted.
 
-**Current version: v0.2, verification and cash.** Runs on localhost only, with no external integrations.
+**Current version: v0.3, bot logic and chat simulator.** Runs on localhost only, with no external integrations.
 
 ## What it does
 
@@ -24,6 +24,19 @@ or deleted.
   someone else's behalf.
 - Cash counts: what the cash box should hold (cash in minus cash out) against what was counted.
 - An activity log of every entry, correction, check and count, open to every member.
+- The same UPI transaction ID can't be recorded twice (v0.3), whether from the form or from chat.
+- The NoCap bot (v0.3), tried out in a WhatsApp-style **Chat simulator** before it goes on WhatsApp
+  in v0.6:
+  - In the class group it answers when tagged: `@NoCap who hasn't paid for freshers?`,
+    `how much is left`, `how much was spent`, `my status`. Answers are fixed templates filled from
+    the database, never made up.
+  - In an admin's private chat, a payment screenshot (or `cash in 500 from Rahul Das`) is read back
+    first; reply `1` to save it or `2` to fix the amount, name, direction or event.
+  - When money is recorded for a member, the bot asks them in their private chat; `YES` confirms
+    it, `NO` asks what's wrong and records a dispute.
+  - Until the AI reader arrives in v0.5, the simulator's sample screenshots carry their payment
+    details inside the PNG, and a mock reader reads those. Any other image counts as unreadable,
+    and the bot asks for the details as text.
 - Login is a local "pick a person" screen for development. Phone and PIN login arrives in v0.4.
 
 ## Run it
@@ -38,7 +51,9 @@ npm run seed              # loads a demo club: 10 people, 2 events
 npm run dev               # API on :4000, web app on http://localhost:5173
 ```
 
-Open http://localhost:5173 and pick a person. Priya Nair is the treasurer (admin).
+Open http://localhost:5173 and pick a person. Priya Nair is the treasurer (admin). The **Chat
+simulator** link in the header (development only) opens the bot: start in the class group, or in
+Priya's private chat to record a payment.
 
 ## Tests
 
@@ -60,11 +75,13 @@ Other checks: `npm run test:coverage`, `npm run typecheck`, `npm run lint`, `npm
 ```
 shared/   Types and money helpers used by both server and client (amounts are whole paise)
 server/   Express 5 + Mongoose 8 API
-  src/models/     Member, Event, LedgerEntry, Verification, CashCount, AuditEvent (all append-only)
+  src/models/     Member, Event, LedgerEntry, Verification, CashCount, AuditEvent, BotMessage
+                  (all append-only); BotChat and BotPing hold the bot's conversation state
   src/services/   ledger totals, entries and corrections, verification, fees, cash, audit
-  src/routes/     auth, events, entries, members, me, activity, proofs
+  src/bot/        the bot engine: intents, reply templates, drafts, payment checks, screenshot reader
+  src/routes/     auth, events, entries, members, me, activity, proofs, simulator (dev only)
   tests/          API and model tests
-client/   React 19 + Vite app (React Router 7)
+client/   React 19 + Vite app (React Router 7); src/sim/ draws the sample screenshots
 e2e/      Playwright browser tests
 ```
 

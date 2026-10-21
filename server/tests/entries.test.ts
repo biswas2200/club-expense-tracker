@@ -57,7 +57,7 @@ describe('creating entries', () => {
       mode: 'upi',
       amountPaise: 120000,
       counterparty: 'Decor Shop',
-      txnId: '4321 8765 0001',
+      txnId: '432187650001', // stored without spaces so duplicates can be found
       note: 'Balloons',
       status: 'active',
       isVoid: false,

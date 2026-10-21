@@ -10,6 +10,10 @@ export type Direction = (typeof DIRECTIONS)[number];
 export const MODES = ['upi', 'cash'] as const;
 export type Mode = (typeof MODES)[number];
 
+/** web: the NoCap app; chat: a message to the bot (the simulator now, WhatsApp from v0.6). */
+export const ENTRY_SOURCES = ['web', 'chat'] as const;
+export type EntrySource = (typeof ENTRY_SOURCES)[number];
+
 export const VERIFICATION_OUTCOMES = ['confirmed', 'disputed'] as const;
 export type VerificationOutcome = (typeof VERIFICATION_OUTCOMES)[number];
 
@@ -96,6 +100,7 @@ export interface EntryDTO {
   correctsEntryId?: string;
   /** why the correction was made */
   reason?: string;
+  source: EntrySource;
   /** a correction with amount 0 cancels the original entry */
   isVoid: boolean;
   status: EntryStatus;
@@ -171,3 +176,44 @@ export interface ApiError {
   error: string;
   details?: Record<string, string>;
 }
+
+// ---- v0.3: the bot and its chat simulator ---------------------------------------------
+
+/** private: one person and the bot (admin mode for admins); group: the class group. */
+export type ChatKind = 'private' | 'group';
+
+export interface BotMessageDTO {
+  id: string;
+  chatId: string;
+  /** person: someone wrote to the bot; bot: the bot wrote */
+  from: 'person' | 'bot';
+  /** who wrote it, for messages from people */
+  sender?: PersonRef;
+  text?: string;
+  imageUrl?: string;
+  createdAt: string;
+}
+
+export interface SimChatDTO {
+  id: string;
+  kind: ChatKind;
+  title: string;
+  /** the person in a private chat */
+  person?: MemberDTO;
+  lastMessage?: Pick<BotMessageDTO, 'from' | 'text' | 'createdAt'>;
+  /** the bot asked something here and is waiting for the answer */
+  awaitingReply: boolean;
+}
+
+/** What a sample screenshot carries in its PNG text chunk, standing in for an AI reading. */
+export interface SamplePayment {
+  amountPaise: number;
+  direction: Direction;
+  counterparty: string;
+  txnId?: string;
+  /** ISO date and time shown on the screenshot */
+  paidAt?: string;
+}
+
+/** The PNG text keyword the mock screenshot parser reads. */
+export const SAMPLE_PAYMENT_KEY = 'nocap-payment';

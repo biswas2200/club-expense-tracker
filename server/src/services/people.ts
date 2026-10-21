@@ -15,3 +15,15 @@ export function personRef(names: Map<string, string>, id: Id): PersonRef | undef
   if (!id) return undefined;
   return { id: String(id), name: names.get(String(id)) ?? 'Unknown' };
 }
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** An admin or member whose full name matches, ignoring case and extra spaces. */
+export function findClubMemberByName(name: string) {
+  const wanted = name.trim().replace(/\s+/g, ' ');
+  if (!wanted) return Promise.resolve(null);
+  return Member.findOne({
+    role: { $in: ['admin', 'member'] },
+    name: { $regex: `^${escapeRegExp(wanted)}$`, $options: 'i' },
+  }).lean();
+}

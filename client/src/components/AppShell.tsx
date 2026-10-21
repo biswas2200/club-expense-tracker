@@ -65,6 +65,8 @@ export function AppShell() {
             {pending ? <span className="count-badge">{pending}</span> : null}
           </NavLink>
           <NavLink to="/activity">Activity</NavLink>
+          {/* The bot's test bench; dev builds only, like the pick-a-member login. */}
+          {import.meta.env.DEV && <NavLink to="/simulator">Chat simulator</NavLink>}
         </nav>
       </header>
       <main className="page">

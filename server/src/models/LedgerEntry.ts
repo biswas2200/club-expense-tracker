@@ -1,5 +1,5 @@
 import { model, Schema, type InferSchemaType } from 'mongoose';
-import { DIRECTIONS, MODES } from '@nocap/shared';
+import { DIRECTIONS, ENTRY_SOURCES, MODES } from '@nocap/shared';
 import { makeAppendOnly } from '../lib/appendOnly';
 
 const ledgerEntrySchema = new Schema(
@@ -22,6 +22,8 @@ const ledgerEntrySchema = new Schema(
     /** Set on a correction: the entry it replaces. */
     correctsEntryId: { type: Schema.Types.ObjectId, ref: 'LedgerEntry' },
     reason: { type: String, trim: true, maxlength: 300 },
+    /** Where it was recorded: the web app or a chat with the bot. */
+    source: { type: String, enum: ENTRY_SOURCES, default: 'web' },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
 );
@@ -32,6 +34,9 @@ ledgerEntrySchema.index(
   { correctsEntryId: 1 },
   { unique: true, partialFilterExpression: { correctsEntryId: { $exists: true } } },
 );
+
+// Duplicate UPI payments are looked up by transaction ID.
+ledgerEntrySchema.index({ txnId: 1 }, { partialFilterExpression: { txnId: { $exists: true } } });
 
 makeAppendOnly(
   ledgerEntrySchema,

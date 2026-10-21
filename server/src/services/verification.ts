@@ -1,7 +1,8 @@
 import { unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
-import { VERIFICATION_OUTCOMES, type EntryDTO } from '@nocap/shared';
+import { VERIFICATION_OUTCOMES, type EntryDTO, type EntrySource } from '@nocap/shared';
+import { askNext, closePing } from '../bot/pingQueue';
 import { HttpError, notFound } from '../lib/http';
 import { LedgerEntry } from '../models/LedgerEntry';
 import { Member, type MemberDoc } from '../models/Member';
@@ -22,6 +23,7 @@ interface VerifyInput {
   body: unknown;
   file?: { buffer: Buffer };
   uploadDir: string;
+  channel?: EntrySource;
 }
 
 /**
@@ -37,6 +39,7 @@ export async function verifyEntry({
   body,
   file,
   uploadDir,
+  channel = 'web',
 }: VerifyInput): Promise<EntryDTO> {
   const fields = verifySchema.parse(body);
   const entry = (await LedgerEntry.findById(entryId).lean()) as StoredEntry | null;
@@ -89,6 +92,7 @@ export async function verifyEntry({
       method,
       note: fields.note,
       proofPath: bill,
+      channel,
     });
   } catch (err) {
     if (bill) await unlink(path.join(uploadDir, bill)).catch(() => {});
@@ -102,7 +106,11 @@ export async function verifyEntry({
     action: fields.outcome === 'disputed' ? 'entry.disputed' : 'entry.confirmed',
     eventId: entry.eventId,
     entryId: entry._id,
-    summary: `${verb} ${describeEntry(entry)}${fields.note ? `: ${fields.note}` : ''}`,
+    summary: `${verb} ${describeEntry(entry)}${channel === 'chat' ? ' via chat' : ''}${fields.note ? `: ${fields.note}` : ''}`,
   });
+
+  // Answered in the app: the bot stops waiting for a reply and asks its next question.
+  const waiting = await closePing(entry._id, 'answered');
+  if (waiting) await askNext(waiting);
   return entryDTO(entry.eventId, entry._id);
 }

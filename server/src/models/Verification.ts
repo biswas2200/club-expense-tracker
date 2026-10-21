@@ -1,5 +1,5 @@
 import { model, Schema, type InferSchemaType } from 'mongoose';
-import { VERIFICATION_OUTCOMES } from '@nocap/shared';
+import { ENTRY_SOURCES, VERIFICATION_OUTCOMES } from '@nocap/shared';
 import { makeAppendOnly } from '../lib/appendOnly';
 
 /**
@@ -17,6 +17,8 @@ const verificationSchema = new Schema(
     note: { type: String, trim: true, maxlength: 300 },
     /** A bill or receipt attached while verifying a cash entry that had none. */
     proofPath: { type: String },
+    /** Where the check was made: the web app or a chat with the bot. */
+    channel: { type: String, enum: ENTRY_SOURCES, default: 'web' },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
 );

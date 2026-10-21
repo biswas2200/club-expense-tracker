@@ -28,7 +28,8 @@ test('an admin adds a UPI expense with a screenshot and the dashboard updates', 
     mode: 'UPI',
     amount: '1,200',
     party: 'Decor Shop',
-    txnId: '4321 8765 0001',
+    // A fresh UPI ref every run: the same ref twice is refused as a duplicate (v0.3).
+    txnId: `4321 ${String(Date.now()).slice(-8)}`,
   });
 
   const row = page
@@ -43,6 +44,24 @@ test('an admin adds a UPI expense with a screenshot and the dashboard updates', 
 
   const href = await row.getByRole('link', { name: /^View proof/ }).getAttribute('href');
   expect((await page.request.get(href!)).status()).toBe(200);
+});
+
+test('the form refuses a UPI payment that is already in the ledger', async ({ page }) => {
+  await loginAs(page, ADMIN);
+  const event = await createEventViaApi(page, 10000);
+  await page.goto(`/events/${event.id}`);
+  // The seeded Decor Shop payment in Freshers Party 2026 has this ref.
+  const dialog = await addEntry(page, {
+    direction: 'Money out',
+    mode: 'UPI',
+    amount: '1,200',
+    party: 'Decor Shop',
+    txnId: '5120 1433 4210',
+  });
+  await expect(dialog.getByRole('alert')).toContainText(
+    'This UPI payment (ref 512014334210) is already recorded: ₹1,200 paid to Decor Shop in Freshers Party 2026',
+  );
+  await expect(dialog).toBeVisible();
 });
 
 test('an admin records money collected in cash', async ({ page }) => {

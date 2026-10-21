@@ -1443,3 +1443,334 @@ a {
   background: var(--paper);
   color: var(--ink-soft);
 }
+
+/* v0.3: chat simulator ------------------------------------------------------------- */
+
+.sim {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  background: var(--sheet);
+  border-radius: var(--radius-sheet);
+  overflow: hidden;
+  min-height: min(76vh, 720px);
+}
+
+.sim-chats ul {
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem;
+  display: grid;
+  gap: 2px;
+}
+
+.sim-chat {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: var(--radius-control);
+  color: inherit;
+  text-decoration: none;
+}
+
+.sim-chat:hover {
+  background: var(--carbon-wash);
+}
+
+.sim-chat[aria-current='page'] {
+  background: var(--carbon-wash);
+  box-shadow: inset 3px 0 0 var(--carbon);
+}
+
+.sim-avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.sim-avatar-group {
+  background: var(--carbon);
+  color: #fff;
+}
+
+.sim-group-icon {
+  width: 1.35rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.sim-chat-main {
+  min-width: 0;
+  display: grid;
+}
+
+.sim-chat-title {
+  font-weight: 650;
+}
+
+.sim-chat-preview {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sim-waiting {
+  display: inline-block;
+  margin-right: 0.4rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--margin);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.sim-pick {
+  display: none;
+}
+
+.sim-thread {
+  display: none;
+  min-width: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: min(76vh, 720px);
+}
+
+.sim-open .sim-thread {
+  display: grid;
+}
+
+.sim-open .sim-chats {
+  display: none;
+}
+
+.sim-thread-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.sim-thread-head h2 {
+  line-height: 1.2;
+}
+
+.sim-back {
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* The thread sits on ruled paper, like the rest of NoCap's receipt book. */
+.sim-messages {
+  list-style: none;
+  margin: 0;
+  padding: 1rem 0.9rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 27px, rgb(44 62 158 / 0.06) 27px 28px),
+    var(--paper);
+}
+
+.sim-note {
+  align-self: center;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 0.9375rem;
+  padding: 2rem 1rem;
+}
+
+.bubble {
+  max-width: min(85%, 34rem);
+  padding: 0.45rem 0.7rem 0.35rem;
+  border-radius: 10px;
+  box-shadow: 0 1px 1px rgb(31 36 64 / 0.12);
+  display: grid;
+  gap: 0.2rem;
+}
+
+.bubble-bot {
+  align-self: flex-start;
+  background: var(--sheet);
+  border-top-left-radius: 2px;
+}
+
+.bubble-person {
+  align-self: flex-end;
+  background: #dfe5fb;
+  border-top-right-radius: 2px;
+}
+
+.bubble-who {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--carbon);
+}
+
+.bubble-bot .bubble-who {
+  color: var(--in);
+}
+
+.bubble-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.bubble-image img {
+  display: block;
+  width: 160px;
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+.bubble-time {
+  justify-self: end;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.sim-composer {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem 0.75rem;
+  border-top: 1px solid var(--rule);
+  background: var(--sheet);
+}
+
+.sim-sender {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.sim-sender select,
+.sim-compose-row input {
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-control);
+  background: var(--sheet);
+  padding: 0.45rem 0.6rem;
+  min-width: 0;
+}
+
+.sim-compose-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.sim-attach svg {
+  fill: none;
+}
+
+.sim-attachment {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem;
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius-control);
+}
+
+.sim-attachment img {
+  width: 44px;
+  height: 78px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.sim-attachment span {
+  flex: 1;
+  min-width: 0;
+}
+
+.sim-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.sim-chip {
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.sim-chip:hover {
+  border-color: var(--carbon);
+  color: var(--carbon);
+}
+
+.sim-samples {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.sim-sample {
+  font: inherit;
+  width: 100%;
+  display: grid;
+  gap: 0.1rem;
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  background: var(--sheet);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.sim-sample:hover {
+  border-color: var(--carbon);
+}
+
+.sim-sample-label {
+  font-weight: 650;
+}
+
+@media (min-width: 760px) {
+  .sim {
+    grid-template-columns: 290px minmax(0, 1fr);
+  }
+  .sim-chats {
+    border-right: 1px solid var(--rule);
+    overflow-y: auto;
+    max-height: min(76vh, 720px);
+  }
+  .sim-open .sim-chats {
+    display: block;
+  }
+  .sim-thread,
+  .sim-open .sim-thread {
+    display: grid;
+  }
+  .sim:not(.sim-open) .sim-thread {
+    display: none;
+  }
+  .sim:not(.sim-open) .sim-pick {
+    display: grid;
+    place-content: center;
+    text-align: center;
+    padding: 2rem;
+    background: var(--paper);
+  }
+  .sim-back {
+    display: none;
+  }
+}

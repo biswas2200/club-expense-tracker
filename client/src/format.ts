@@ -39,3 +39,13 @@ export function todayInput() {
   const now = new Date();
   return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 }
+
+/** "Rohan Mehta" → "RM", "Prof. S. Kavitha" → "SK", for avatars. */
+export const initials = (name: string) =>
+  name
+    .replace(/^Prof\.\s*/, '')
+    .split(/\s+/)
+    .filter((w) => /^[A-Z]/.test(w))
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('');

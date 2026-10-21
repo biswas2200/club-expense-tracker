@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router';
 import type { MemberDTO, Role } from '@nocap/shared';
 import { api } from '../api';
+import { initials } from '../format';
 import { useAuth } from '../auth';
 import { useResource } from '../useResource';
 
@@ -10,15 +11,6 @@ const GROUPS: { role: Role; title: string; can: string }[] = [
   { role: 'member', title: 'Members', can: 'See every entry and its proof' },
   { role: 'viewer', title: 'Viewers', can: 'Read-only, for the faculty coordinator' },
 ];
-
-const initials = (name: string) =>
-  name
-    .replace(/^Prof\.\s*/, '')
-    .split(/\s+/)
-    .filter((w) => /^[A-Z]/.test(w))
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join('');
 
 export function LoginPage() {
   const { member, checking, logIn } = useAuth();

@@ -92,7 +92,8 @@ function EntryRow({
         {!replaced && !entry.isVoid && <VerificationLine entry={entry} />}
 
         <p className="entry-by">
-          Added by {entry.createdBy.name}, {formatTimestamp(entry.createdAt)}
+          Added by {entry.createdBy.name}
+          {entry.source === 'chat' ? ' via chat' : ''}, {formatTimestamp(entry.createdAt)}
         </p>
 
         <div className="entry-actions">
