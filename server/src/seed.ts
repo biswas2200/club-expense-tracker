@@ -1,41 +1,49 @@
 /**
- * Resets the local database to a demo club: 10 members, two events and a handful of entries
- * (including one correction). Development only.
+ * Resets the local database to a demo club and builds it through the real services, so the
+ * activity log, verifications and cash count are exactly what the app would have recorded.
+ * Development only.
  *
  *   npm run seed
  */
-import { mkdir, rm, writeFile } from 'node:fs/promises';
-import path from 'node:path';
-import { randomUUID } from 'node:crypto';
-import mongoose from 'mongoose';
+import { mkdir, rm } from 'node:fs/promises';
+import mongoose, { Types } from 'mongoose';
+import type { EntryDTO } from '@nocap/shared';
 import { config } from './config';
 import { placeholderPng } from './lib/placeholderPng';
+import { Member, type MemberDoc } from './models/Member';
+import { recordCashCount } from './services/cash';
+import { createEntry } from './services/entries';
+import { createEvent } from './services/events';
+import { verifyEntry } from './services/verification';
 import { Event } from './models/Event';
-import { LedgerEntry } from './models/LedgerEntry';
-import { Member } from './models/Member';
 
 if (config.isProduction) {
   throw new Error('Refusing to seed a production database');
 }
 
-const rupees = (r: number) => Math.round(r * 100);
-
-async function proof(accent: [number, number, number]) {
-  const file = `${randomUUID()}.png`;
-  await writeFile(path.join(config.uploadDir, file), placeholderPng(accent));
-  return file;
-}
+const rupees = (r: number) => String(Math.round(r * 100));
+type Rgb = [number, number, number];
+const GREEN: Rgb = [22, 163, 74];
+const BLUE: Rgb = [37, 99, 235];
+const AMBER: Rgb = [217, 119, 6];
 
 export async function seed() {
-  // The ledger is append-only through Mongoose, so a dev reset goes through the raw driver.
+  // Everything is append-only through Mongoose, so a dev reset goes through the raw driver.
   const db = mongoose.connection.db!;
-  for (const name of ['members', 'events', 'ledger_entries']) {
+  for (const name of [
+    'members',
+    'events',
+    'ledger_entries',
+    'verifications',
+    'cash_counts',
+    'audit_log',
+  ]) {
     await db.collection(name).deleteMany({});
   }
   await rm(config.uploadDir, { recursive: true, force: true });
   await mkdir(config.uploadDir, { recursive: true });
 
-  const people = await Member.insertMany([
+  const people = (await Member.insertMany([
     { name: 'Rohan Mehta', role: 'admin', phone: '9000000001' },
     { name: 'Priya Nair', role: 'admin', phone: '9000000002' },
     { name: 'Arjun Rao', role: 'admin', phone: '9000000003' },
@@ -46,128 +54,170 @@ export async function seed() {
     { name: 'Meera Joshi', role: 'member', phone: '9000000008' },
     { name: 'Rahul Das', role: 'member', phone: '9000000009' },
     { name: 'Prof. S. Kavitha', role: 'viewer', phone: '9000000010' },
-  ]);
-  const by = Object.fromEntries(people.map((p) => [p.name, p._id]));
-  const treasurer = by['Priya Nair'];
+  ])) as MemberDoc[];
+  const who = (name: string) => people.find((p) => p.name === name)!;
+  const [rohan, priya, arjun] = [who('Rohan Mehta'), who('Priya Nair'), who('Arjun Rao')];
+  const id = (p: MemberDoc) => String(p._id);
 
-  const freshers = await Event.create({
-    name: 'Freshers Party 2026',
-    budgetPaise: rupees(25000),
-    createdBy: by['Rohan Mehta'],
-  });
-  const fest = await Event.create({
-    name: 'Tech Fest 2026',
-    budgetPaise: rupees(40000),
-    createdBy: by['Rohan Mehta'],
-  });
+  async function seedEvent(name: string, budget: number, fee = 0) {
+    const dto = await createEvent(rohan, {
+      name,
+      budgetPaise: Number(rupees(budget)),
+      feePaise: Number(rupees(fee)),
+    });
+    const eventId = new Types.ObjectId(dto.id);
+    const record = (actor: MemberDoc, fields: Record<string, string>, proof?: Rgb) =>
+      createEntry({
+        eventId,
+        body: fields,
+        file: proof ? { buffer: placeholderPng(proof) } : undefined,
+        member: actor,
+        uploadDir: config.uploadDir,
+      });
+    return { eventId, record };
+  }
+  const check = (actor: MemberDoc, entry: EntryDTO, outcome = 'confirmed', note?: string) =>
+    verifyEntry({ entryId: entry.id, actor, body: { outcome, note }, uploadDir: config.uploadDir });
 
-  const green: [number, number, number] = [22, 163, 74];
-  const blue: [number, number, number] = [37, 99, 235];
-  const amber: [number, number, number] = [217, 119, 6];
+  // ---- Freshers Party 2026: ₹500 fee per member -----------------------------------------
+  const freshers = await seedEvent('Freshers Party 2026', 25000, 500);
+  const fee = (
+    payer: string,
+    day: string,
+    mode: 'upi' | 'cash',
+    extra: Record<string, string> = {},
+    by = priya,
+  ) =>
+    freshers.record(
+      by,
+      {
+        direction: 'in',
+        mode,
+        amountPaise: rupees(500),
+        counterparty: payer,
+        occurredAt: `2026-10-${day}`,
+        memberId: id(who(payer)),
+        note: 'Freshers fee',
+        ...(mode === 'upi' ? { txnId: `5120${day}${payer.length}8831` } : {}),
+        ...extra,
+      },
+      mode === 'upi' ? GREEN : undefined,
+    );
 
-  const add = async (fields: Record<string, unknown>) =>
-    LedgerEntry.create({ createdBy: treasurer, eventId: freshers._id, ...fields });
+  const sneha = await fee('Sneha Kulkarni', '06', 'upi');
+  await fee('Karthik Iyer', '06', 'upi');
+  const vikram = await fee('Vikram Shetty', '07', 'upi');
+  await fee('Ananya Gupta', '07', 'cash', { note: 'Freshers fee, paid in class' });
+  const meera = await fee('Meera Joshi', '07', 'cash', { note: 'Freshers fee, paid in class' });
+  const rohanFee = await fee('Rohan Mehta', '08', 'upi');
+  const priyaFee = await fee('Priya Nair', '08', 'upi');
+  await fee('Rahul Das', '08', 'cash', { paidByMemberId: id(rohan), note: 'Rohan paid for Rahul' });
 
-  for (const [name, day] of [
-    ['Sneha Kulkarni', '06'],
-    ['Karthik Iyer', '06'],
-    ['Vikram Shetty', '07'],
-  ] as const) {
-    await add({
+  const out = (
+    party: string,
+    amount: number,
+    day: string,
+    mode: 'upi' | 'cash',
+    note: string,
+    proof?: Rgb,
+    txnId?: string,
+  ) =>
+    freshers.record(
+      priya,
+      {
+        direction: 'out',
+        mode,
+        amountPaise: rupees(amount),
+        counterparty: party,
+        occurredAt: `2026-10-${day}`,
+        note,
+        ...(txnId ? { txnId } : {}),
+      },
+      proof,
+    );
+
+  const cafe = await freshers.record(
+    priya,
+    {
       direction: 'in',
       mode: 'upi',
-      amountPaise: rupees(500),
-      counterparty: name,
-      occurredAt: new Date(`2026-10-${day}`),
-      txnId: `5120${day}${name.length}8831`,
-      note: 'Freshers fee',
-      proofPath: await proof(green),
-    });
-  }
-  await add({
-    direction: 'in',
-    mode: 'cash',
-    amountPaise: rupees(500),
-    counterparty: 'Ananya Gupta',
-    occurredAt: new Date('2026-10-07'),
-    note: 'Freshers fee, paid in class',
-    proofPath: await proof(green),
-  });
-  await add({
-    direction: 'in',
-    mode: 'upi',
-    amountPaise: rupees(10000),
-    counterparty: 'Campus Cafe (sponsor)',
-    occurredAt: new Date('2026-10-08'),
-    txnId: '512008776610',
-    note: 'Sponsorship',
-    proofPath: await proof(green),
-  });
+      amountPaise: rupees(10000),
+      counterparty: 'Campus Cafe (sponsor)',
+      occurredAt: '2026-10-08',
+      txnId: '512008776610',
+      note: 'Sponsorship',
+    },
+    GREEN,
+  );
+  const classFund = await freshers.record(
+    priya,
+    {
+      direction: 'in',
+      mode: 'cash',
+      amountPaise: rupees(4000),
+      counterparty: 'Class fund (from the CR)',
+      occurredAt: '2026-10-09',
+      note: 'Leftover class fund handed over',
+    },
+    GREEN,
+  );
+  const decor = await out(
+    'Decor Shop',
+    1200,
+    '14',
+    'upi',
+    'Balloons and streamers',
+    BLUE,
+    '512014334210',
+  );
+  await out('Sound & Lights Co.', 6000, '15', 'upi', 'DJ advance', BLUE, '512015902211');
+  const bake = await out('Bake House', 3450, '16', 'cash', 'Snacks', AMBER);
+  const banner = await out('Print Point', 850, '16', 'cash', 'Banners', AMBER);
+  await out('Tea stall', 200, '17', 'cash', 'Tea and water for the setup team');
 
-  await add({
-    direction: 'out',
-    mode: 'upi',
-    amountPaise: rupees(1200),
-    counterparty: 'Decor Shop',
-    occurredAt: new Date('2026-10-14'),
-    txnId: '512014334210',
-    note: 'Balloons and streamers',
-    proofPath: await proof(blue),
-  });
-  await add({
-    direction: 'out',
-    mode: 'upi',
-    amountPaise: rupees(6000),
-    counterparty: 'Sound & Lights Co.',
-    occurredAt: new Date('2026-10-15'),
-    txnId: '512015902211',
-    note: 'DJ advance',
-    proofPath: await proof(blue),
-  });
-  await add({
-    direction: 'out',
-    mode: 'cash',
-    amountPaise: rupees(3450),
-    counterparty: 'Bake House',
-    occurredAt: new Date('2026-10-16'),
-    note: 'Snacks',
-    proofPath: await proof(amber),
-  });
-
-  const banner = await add({
-    direction: 'out',
-    mode: 'cash',
-    amountPaise: rupees(850),
-    counterparty: 'Print Point',
-    occurredAt: new Date('2026-10-16'),
-    note: 'Banners',
-    proofPath: await proof(amber),
-  });
-  await add({
+  await freshers.record(arjun, {
     direction: 'out',
     mode: 'cash',
     amountPaise: rupees(580),
     counterparty: 'Print Point',
-    occurredAt: new Date('2026-10-16'),
+    occurredAt: '2026-10-16',
     note: 'Banners',
-    proofPath: banner.proofPath,
-    correctsEntryId: banner._id,
+    correctsEntryId: banner.id,
     reason: 'Typo: the bill says ₹580',
-    createdBy: by['Arjun Rao'],
   });
 
-  await LedgerEntry.create({
-    eventId: fest._id,
-    createdBy: treasurer,
-    direction: 'in',
-    mode: 'upi',
-    amountPaise: rupees(10000),
-    counterparty: 'Alumni association',
-    occurredAt: new Date('2026-10-18'),
-    txnId: '512018120045',
-    note: 'Sponsorship',
-    proofPath: await proof(green),
+  await check(who('Sneha Kulkarni'), sneha);
+  await check(who('Vikram Shetty'), vikram);
+  await check(rohan, rohanFee);
+  await check(arjun, priyaFee); // Priya recorded her own fee, so another admin checks it.
+  await check(who('Meera Joshi'), meera, 'disputed', 'I paid ₹300 in cash; ₹200 is still due');
+  await check(arjun, cafe);
+  await check(arjun, decor);
+  await check(rohan, classFund);
+  await check(rohan, bake);
+
+  const freshersEvent = await Event.findById(freshers.eventId).lean();
+  await recordCashCount(freshersEvent!, rohan, {
+    countedPaise: Number(rupees(1220)),
+    note: 'Cash box after the snacks run',
   });
+
+  // ---- Tech Fest 2026 --------------------------------------------------------------------
+  const fest = await seedEvent('Tech Fest 2026', 40000);
+  const alumni = await fest.record(
+    priya,
+    {
+      direction: 'in',
+      mode: 'upi',
+      amountPaise: rupees(10000),
+      counterparty: 'Alumni association',
+      occurredAt: '2026-10-18',
+      txnId: '512018120045',
+      note: 'Sponsorship',
+    },
+    GREEN,
+  );
+  await check(arjun, alumni);
 
   return { members: people.length, events: 2 };
 }

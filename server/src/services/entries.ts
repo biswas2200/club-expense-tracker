@@ -1,16 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { mongo, type Types } from 'mongoose';
+import { isValidObjectId, mongo, type Types } from 'mongoose';
 import { z } from 'zod';
-import { DIRECTIONS, MAX_PAISE, MODES, type EntryDTO } from '@nocap/shared';
+import { DIRECTIONS, formatPaise, MAX_PAISE, MODES, type EntryDTO } from '@nocap/shared';
 import { detectProofType } from '../lib/fileType';
 import { assertObjectId, HttpError, notFound } from '../lib/http';
-import type { MemberDoc } from '../models/Member';
 import { LedgerEntry } from '../models/LedgerEntry';
-import { listEntryDTOs } from './ledger';
+import { Member, type MemberDoc } from '../models/Member';
+import { describeEntry, recordAudit } from './audit';
+import { entryDTO, type StoredEntry } from './ledger';
 
-const optionalText = (max: number) =>
+export const optionalText = (max: number) =>
   z
     .string()
     .trim()
@@ -37,7 +38,28 @@ export const entryFieldsSchema = z.object({
   note: optionalText(500),
   correctsEntryId: optionalText(24),
   reason: optionalText(300),
+  memberId: optionalText(24),
+  paidByMemberId: optionalText(24),
 });
+
+/** Members and admins can pay or be paid; the faculty viewer only reads. */
+async function findClubMember(id: string | undefined) {
+  if (!id) return undefined;
+  const refused = new HttpError(400, 'Pick a club member: an admin or a member');
+  if (!isValidObjectId(id)) throw refused;
+  const member = await Member.findById(id).lean();
+  if (!member || member.role === 'viewer') throw refused;
+  return member;
+}
+
+/** Checks a proof file's bytes and writes it under a random name. Returns the file name. */
+export async function saveProof(file: { buffer: Buffer }, uploadDir: string, label = 'Proof') {
+  const type = detectProofType(file.buffer);
+  if (!type) throw new HttpError(400, `${label} must be a JPG, PNG, WebP or PDF file`);
+  const name = `${randomUUID()}.${type.ext}`;
+  await writeFile(path.join(uploadDir, name), file.buffer, { flag: 'wx' });
+  return name;
+}
 
 interface CreateEntryInput {
   eventId: Types.ObjectId;
@@ -55,21 +77,26 @@ export async function createEntry({
   eventId,
   body,
   file,
-  member,
+  member: actor,
   uploadDir,
 }: CreateEntryInput): Promise<EntryDTO> {
   const fields = entryFieldsSchema.parse(body);
 
-  const proofType = file ? detectProofType(file.buffer) : null;
-  if (file && !proofType) {
+  if (file && !detectProofType(file.buffer)) {
     throw new HttpError(400, 'Proof must be a JPG, PNG, WebP or PDF file');
   }
+  if (fields.paidByMemberId && !fields.memberId) {
+    throw new HttpError(400, 'Pick the club member this payment is for');
+  }
+  const member = await findClubMember(fields.memberId);
+  let paidBy = await findClubMember(fields.paidByMemberId);
+  if (paidBy && member && paidBy._id.equals(member._id)) paidBy = undefined;
 
-  let inheritedProof: string | undefined;
+  let target: StoredEntry | null = null;
   if (fields.correctsEntryId) {
-    const target = await LedgerEntry.findById(
+    target = (await LedgerEntry.findById(
       assertObjectId(fields.correctsEntryId, 'Entry being corrected'),
-    ).lean();
+    ).lean()) as StoredEntry | null;
     if (!target) throw notFound('Entry being corrected');
     if (!target.eventId.equals(eventId)) {
       throw new HttpError(400, 'That entry belongs to a different event');
@@ -81,32 +108,40 @@ export async function createEntry({
         'This entry has already been corrected. Correct the latest version instead.',
       );
     }
-    inheritedProof = target.proofPath;
   } else {
-    if (!file) {
-      throw new HttpError(
-        400,
-        'A proof is required: attach the UPI screenshot, bill photo or receipt',
-      );
+    if (!file && fields.mode === 'upi') {
+      throw new HttpError(400, 'A proof is required for UPI: attach the payment screenshot');
     }
     if (fields.amountPaise === 0) throw new HttpError(400, 'Amount must be more than ₹0');
   }
 
-  let savedFile: string | undefined;
-  if (file && proofType) {
-    savedFile = `${randomUUID()}.${proofType.ext}`;
-    await writeFile(path.join(uploadDir, savedFile), file.buffer, { flag: 'wx' });
-  }
-
+  const savedFile = file ? await saveProof(file, uploadDir) : undefined;
   try {
     const entry = await LedgerEntry.create({
       ...fields,
+      counterparty: member ? member.name : fields.counterparty,
+      memberId: member?._id,
+      paidByMemberId: paidBy?._id,
       eventId,
-      proofPath: savedFile ?? inheritedProof,
-      createdBy: member._id,
+      proofPath: savedFile ?? target?.proofPath,
+      createdBy: actor._id,
     });
-    const dtos = await listEntryDTOs(eventId);
-    return dtos.find((d) => d.id === String(entry._id))!;
+
+    let summary = `Recorded ${describeEntry(entry)} by ${entry.mode === 'upi' ? 'UPI' : 'cash'}`;
+    if (target) {
+      summary =
+        entry.amountPaise === 0
+          ? `Voided ${describeEntry(target)}: ${entry.reason}`
+          : `Corrected ${describeEntry(target)} to ${formatPaise(entry.amountPaise)}: ${entry.reason}`;
+    }
+    await recordAudit({
+      actorId: actor._id,
+      action: target ? 'entry.corrected' : 'entry.recorded',
+      eventId,
+      entryId: entry._id,
+      summary,
+    });
+    return entryDTO(eventId, entry._id);
   } catch (err) {
     if (savedFile) await unlink(path.join(uploadDir, savedFile)).catch(() => {});
     if (err instanceof mongo.MongoServerError && err.code === 11000) {

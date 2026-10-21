@@ -2,9 +2,12 @@ import { mkdirSync } from 'node:fs';
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import { errorHandler } from './lib/http';
+import { activityRouter } from './routes/activity';
 import { authRouter } from './routes/auth';
 import { entriesRouter } from './routes/entries';
 import { eventsRouter } from './routes/events';
+import { meRouter } from './routes/me';
+import { membersRouter } from './routes/members';
 import { proofsRouter } from './routes/proofs';
 
 export interface AppOptions {
@@ -31,7 +34,10 @@ export function createApp(opts: AppOptions) {
     authRouter({ devLogin: opts.devLogin, secureCookies: opts.secureCookies ?? false }),
   );
   app.use('/api/events', eventsRouter(opts));
-  app.use('/api/entries', entriesRouter());
+  app.use('/api/entries', entriesRouter(opts));
+  app.use('/api/members', membersRouter());
+  app.use('/api/me', meRouter());
+  app.use('/api/activity', activityRouter());
   app.use('/api/proofs', proofsRouter(opts));
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Not found' });

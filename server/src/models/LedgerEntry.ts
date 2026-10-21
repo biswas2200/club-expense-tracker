@@ -1,13 +1,6 @@
 import { model, Schema, type InferSchemaType } from 'mongoose';
 import { DIRECTIONS, MODES } from '@nocap/shared';
-
-export class AppendOnlyError extends Error {
-  constructor() {
-    super(
-      'Ledger entries are append-only: add a correction instead of changing or deleting an entry',
-    );
-  }
-}
+import { makeAppendOnly } from '../lib/appendOnly';
 
 const ledgerEntrySchema = new Schema(
   {
@@ -19,8 +12,12 @@ const ledgerEntrySchema = new Schema(
     occurredAt: { type: Date, required: true },
     txnId: { type: String, trim: true, maxlength: 64 },
     note: { type: String, trim: true, maxlength: 500 },
-    /** File name inside the upload folder. */
-    proofPath: { type: String, required: true },
+    /** File name inside the upload folder. UPI entries always have one; cash may not. */
+    proofPath: { type: String },
+    /** The club member who paid (money in) or was paid (money out). */
+    memberId: { type: Schema.Types.ObjectId, ref: 'Member', index: true },
+    /** Set when someone else paid on the member's behalf. */
+    paidByMemberId: { type: Schema.Types.ObjectId, ref: 'Member', index: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'Member', required: true },
     /** Set on a correction: the entry it replaces. */
     correctsEntryId: { type: Schema.Types.ObjectId, ref: 'LedgerEntry' },
@@ -36,29 +33,11 @@ ledgerEntrySchema.index(
   { unique: true, partialFilterExpression: { correctsEntryId: { $exists: true } } },
 );
 
-// Append-only guard: every Mongoose path that could change or remove a stored entry throws.
-// (Raw driver calls bypass this; v1.0-beta adds a MongoDB role without update/delete rights.)
-const refuse = async () => {
-  throw new AppendOnlyError();
-};
-ledgerEntrySchema.pre(
-  [
-    'updateOne',
-    'updateMany',
-    'findOneAndUpdate',
-    'replaceOne',
-    'findOneAndReplace',
-    'deleteOne',
-    'deleteMany',
-    'findOneAndDelete',
-  ],
-  { document: false, query: true },
-  refuse,
+makeAppendOnly(
+  ledgerEntrySchema,
+  'Ledger entries',
+  'add a correction instead of changing or deleting an entry',
 );
-ledgerEntrySchema.pre(['updateOne', 'deleteOne'], { document: true, query: false }, refuse);
-ledgerEntrySchema.pre('save', async function () {
-  if (!this.isNew) throw new AppendOnlyError();
-});
 
 export type LedgerEntryFields = InferSchemaType<typeof ledgerEntrySchema>;
 

@@ -1,23 +1,13 @@
 import { Router } from 'express';
-import multer from 'multer';
-import { z } from 'zod';
-import { MAX_PAISE } from '@nocap/shared';
 import { assertObjectId, notFound } from '../lib/http';
+import { proofUpload } from '../lib/uploads';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { Event } from '../models/Event';
+import { cashSummary, recordCashCount } from '../services/cash';
 import { createEntry } from '../services/entries';
+import { createEvent } from '../services/events';
+import { eventFees } from '../services/fees';
 import { eventDTOs, listEntryDTOs, listEventDTOs } from '../services/ledger';
-
-export const PROOF_MAX_BYTES = 5 * 1024 * 1024;
-
-const newEventSchema = z.object({
-  name: z.string().trim().min(1, 'Event name is required').max(100),
-  budgetPaise: z
-    .number({ message: 'Budget is required' })
-    .int('Budget must be a whole number of paise')
-    .min(0, 'Budget cannot be negative')
-    .max(MAX_PAISE, 'Budget is too large'),
-});
 
 async function findEvent(eventId: unknown) {
   const id = typeof eventId === 'string' ? eventId : undefined;
@@ -28,11 +18,6 @@ async function findEvent(eventId: unknown) {
 
 export function eventsRouter(opts: { uploadDir: string }) {
   const router = Router();
-  const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: PROOF_MAX_BYTES, files: 1, fields: 20 },
-  });
-
   router.use(requireAuth);
 
   router.get('/', async (_req, res) => {
@@ -40,10 +25,7 @@ export function eventsRouter(opts: { uploadDir: string }) {
   });
 
   router.post('/', requireRole('admin'), async (req, res) => {
-    const body = newEventSchema.parse(req.body);
-    const event = await Event.create({ ...body, createdBy: req.member!._id });
-    const [dto] = await eventDTOs([event.toObject()]);
-    res.status(201).json(dto);
+    res.status(201).json(await createEvent(req.member!, req.body));
   });
 
   router.get('/:eventId', async (req, res) => {
@@ -56,7 +38,7 @@ export function eventsRouter(opts: { uploadDir: string }) {
     res.json(await listEntryDTOs(event._id));
   });
 
-  // Role and event checks run before multer, so a refused request never uploads a file.
+  // Role and event checks run before the upload is read, so a refused request never writes a file.
   router.post(
     '/:eventId/entries',
     requireRole('admin'),
@@ -64,7 +46,7 @@ export function eventsRouter(opts: { uploadDir: string }) {
       res.locals.event = await findEvent(req.params.eventId);
       next();
     },
-    upload.single('proof'),
+    proofUpload(),
     async (req, res) => {
       const entry = await createEntry({
         eventId: res.locals.event._id,
@@ -76,6 +58,19 @@ export function eventsRouter(opts: { uploadDir: string }) {
       res.status(201).json(entry);
     },
   );
+
+  router.get('/:eventId/fees', async (req, res) => {
+    res.json(await eventFees(await findEvent(req.params.eventId)));
+  });
+
+  router.get('/:eventId/cash', async (req, res) => {
+    res.json(await cashSummary(await findEvent(req.params.eventId)));
+  });
+
+  router.post('/:eventId/cash-counts', requireRole('admin'), async (req, res) => {
+    const event = await findEvent(req.params.eventId);
+    res.status(201).json(await recordCashCount(event, req.member!, req.body));
+  });
 
   return router;
 }

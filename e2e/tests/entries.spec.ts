@@ -103,3 +103,22 @@ test('a member can see entries but has no add button', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Add entry' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'New event' })).toHaveCount(0);
 });
+
+test('cash can be recorded without a photo; it then needs a bill', async ({ page }) => {
+  await loginAs(page, ADMIN);
+  const event = await createEventViaApi(page);
+  await page.goto(`/events/${event.id}`);
+  await addEntry(page, {
+    direction: 'Money out',
+    mode: 'Cash',
+    amount: '200',
+    party: 'Tea stall',
+    withProof: false,
+  });
+  const row = page
+    .getByRole('list', { name: 'Entries' })
+    .getByRole('listitem')
+    .filter({ hasText: 'Tea stall' });
+  await expect(row).toContainText('Needs a bill');
+  await expect(row.getByRole('link', { name: /^View proof/ })).toHaveCount(0);
+});

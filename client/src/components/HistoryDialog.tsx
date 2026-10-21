@@ -34,9 +34,11 @@ export function HistoryDialog({ entry, onClose }: { entry: EntryDTO; onClose: ()
               {formatTimestamp(v.createdAt)}
             </p>
             {v.reason && <p className="history-reason">{v.reason}</p>}
-            <a href={v.proofUrl} target="_blank" rel="noopener">
-              View proof
-            </a>
+            {v.proofUrl && (
+              <a href={v.proofUrl} target="_blank" rel="noopener">
+                View proof
+              </a>
+            )}
           </li>
         ))}
       </ol>

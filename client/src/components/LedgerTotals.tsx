@@ -1,7 +1,10 @@
 import { formatPaise, type EventSummary } from '@nocap/shared';
 import { BudgetMeter } from './BudgetMeter';
+import { Icon } from './icons';
 
-/** The event's totals, laid out like the bottom of a receipt. */
+const entries = (n: number) => `${n} ${n === 1 ? 'entry' : 'entries'}`;
+
+/** The event's totals, laid out like the bottom of a receipt, then what is still unchecked. */
 export function LedgerTotals({ summary }: { summary: EventSummary }) {
   const rows = [
     { id: 'budget', label: 'Budget', value: summary.budgetPaise },
@@ -25,6 +28,35 @@ export function LedgerTotals({ summary }: { summary: EventSummary }) {
         ))}
       </dl>
       <BudgetMeter spentPaise={summary.spentPaise} budgetPaise={summary.budgetPaise} />
+
+      <dl className="checks-summary">
+        <div
+          data-testid="summary-unverified"
+          className={summary.unverifiedCount ? 'check-row' : 'check-row check-row-clear'}
+        >
+          <dt>
+            <Icon name={summary.unverifiedCount ? 'circle' : 'check'} />
+            Not yet verified
+          </dt>
+          <dd>
+            {summary.unverifiedCount
+              ? `${formatPaise(summary.unverifiedPaise)} in ${entries(summary.unverifiedCount)}`
+              : 'Nothing'}
+          </dd>
+        </div>
+        <div
+          data-testid="summary-disputed"
+          className={
+            summary.disputedCount ? 'check-row check-row-disputed' : 'check-row check-row-clear'
+          }
+        >
+          <dt>
+            <Icon name={summary.disputedCount ? 'alert' : 'check'} />
+            Disputed
+          </dt>
+          <dd>{summary.disputedCount ? entries(summary.disputedCount) : 'None'}</dd>
+        </div>
+      </dl>
       <p className="totals-note muted">
         Balance in hand is collected minus spent: the money the club should be holding right now.
       </p>

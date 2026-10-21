@@ -1,6 +1,13 @@
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
-import { createCast, loginAs, placeholderPng, useTestApp } from './helpers';
+import {
+  createCast,
+  loginAs,
+  makeEvent,
+  placeholderPng,
+  postEntry as post,
+  useTestApp,
+} from './helpers';
 
 const ctx = useTestApp();
 
@@ -158,5 +165,98 @@ describe('proof files', () => {
     const { adminAgent } = await setup();
     await adminAgent.get('/api/proofs/..%2F..%2Fpackage.json').expect(404);
     await adminAgent.get('/api/proofs/does-not-exist.png').expect(404);
+  });
+});
+
+describe('cash entries and members (v0.2)', () => {
+  it('allows cash without a photo; it waits for a bill or a member to confirm', async () => {
+    const { adminAgent, eventId } = await setup();
+    const res = await post(
+      adminAgent,
+      eventId,
+      { mode: 'cash', counterparty: 'Tea stall' },
+      null,
+    ).expect(201);
+    expect(res.body.proofUrl).toBeUndefined();
+    expect(res.body.verification).toMatchObject({ state: 'unverified', needsProof: true });
+  });
+
+  it('still needs the screenshot for UPI', async () => {
+    const { adminAgent, eventId } = await setup();
+    const res = await post(adminAgent, eventId, { mode: 'upi' }, null).expect(400);
+    expect(res.body.error).toMatch(/screenshot/i);
+  });
+
+  it('links a member and uses their name as the counterparty', async () => {
+    const { adminAgent, eventId, member, admin2 } = await setup();
+    const res = await post(
+      adminAgent,
+      eventId,
+      {
+        direction: 'in',
+        mode: 'cash',
+        counterparty: 'whatever was typed',
+        memberId: String(member._id),
+        paidByMemberId: String(admin2._id),
+      },
+      null,
+    ).expect(201);
+    expect(res.body).toMatchObject({
+      counterparty: 'Chitra Member',
+      member: { id: String(member._id), name: 'Chitra Member' },
+      paidBy: { id: String(admin2._id), name: 'Bala Admin' },
+    });
+  });
+
+  it('drops "paid by" when it is the same person', async () => {
+    const { adminAgent, eventId, member } = await setup();
+    const res = await post(
+      adminAgent,
+      eventId,
+      {
+        direction: 'in',
+        mode: 'cash',
+        memberId: String(member._id),
+        paidByMemberId: String(member._id),
+      },
+      null,
+    ).expect(201);
+    expect(res.body.paidBy).toBeUndefined();
+  });
+
+  it.each([
+    ['an unknown member', () => '64b7f0f0f0f0f0f0f0f0f0f0'],
+    ['a malformed id', () => 'nope'],
+  ])('rejects %s', async (_label, id) => {
+    const { adminAgent, eventId } = await setup();
+    const res = await post(adminAgent, eventId, { mode: 'cash', memberId: id() }, null).expect(400);
+    expect(res.body.error).toMatch(/club member/i);
+  });
+
+  it('does not let a viewer be the paying member', async () => {
+    const { adminAgent, eventId, viewer } = await setup();
+    const res = await post(
+      adminAgent,
+      eventId,
+      { mode: 'cash', memberId: String(viewer._id) },
+      null,
+    ).expect(400);
+    expect(res.body.error).toMatch(/club member/i);
+  });
+
+  it('needs a member when "paid by" is set', async () => {
+    const { adminAgent, eventId, admin2 } = await setup();
+    await post(
+      adminAgent,
+      eventId,
+      { mode: 'cash', paidByMemberId: String(admin2._id) },
+      null,
+    ).expect(400);
+  });
+
+  it('accepts entries on an event made with the shared helper', async () => {
+    const { adminAgent } = await setup();
+    const id = await makeEvent(adminAgent, { feePaise: 50000 });
+    await post(adminAgent, id).expect(201);
   });
 });

@@ -980,3 +980,453 @@ a {
     transition: none !important;
   }
 }
+
+/* v0.2: navigation, tabs, verification, fees, cash, activity, my payments ----------- */
+
+.icon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.small {
+  font-size: 0.875rem;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.mainnav {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 8px;
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+}
+
+.mainnav a {
+  color: #fff;
+  opacity: 0.82;
+  text-decoration: none;
+  font-weight: 550;
+  padding: 0.35rem 0.6rem 0.55rem;
+  border-bottom: 3px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.mainnav a:hover {
+  opacity: 1;
+}
+
+.mainnav a.active {
+  opacity: 1;
+  border-bottom-color: #fff;
+}
+
+.count-badge {
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--margin);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  display: inline-grid;
+  place-items: center;
+}
+
+.page-head-stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.page-head-stack p {
+  max-width: 70ch;
+}
+
+.event-main {
+  min-width: 0;
+  display: grid;
+  gap: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  padding: 0 0.25rem;
+}
+
+.tabs [role='tab'] {
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-control) var(--radius-control) 0 0;
+  padding: 0.55rem 0.95rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tabs [role='tab']:hover {
+  color: var(--ink);
+  background: rgb(255 255 255 / 0.6);
+}
+
+.tabs [role='tab'][aria-selected='true'] {
+  color: var(--carbon-deep);
+  background: var(--sheet);
+}
+
+.tabpanel {
+  background: var(--sheet);
+  border-radius: 0 var(--radius-sheet) var(--radius-sheet) var(--radius-sheet);
+  overflow: hidden;
+}
+
+.tabpanel > .ledger-section {
+  border-radius: 0;
+}
+
+.tabpanel > .page-status,
+.tabpanel > .alert {
+  margin: 1rem;
+}
+
+.tabpanel > .empty {
+  border-radius: 0;
+}
+
+.panel {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.panel-head {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.panel-figure {
+  font-size: 1.75rem;
+  font-weight: 700;
+  font-stretch: 80%;
+  line-height: 1.1;
+}
+
+/* Verification line on each entry: icon plus words, never colour alone. */
+.check {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.9375rem;
+  justify-self: start;
+}
+
+.check .icon {
+  margin-top: 0.22em;
+}
+
+.check-ok {
+  color: var(--in);
+}
+
+.check-disputed {
+  color: var(--warn-ink);
+  background: var(--warn);
+  border-radius: 4px;
+  padding: 0.1rem 0.45rem;
+}
+
+.check-waiting {
+  color: var(--ink-soft);
+}
+
+.check-when {
+  color: var(--ink-soft);
+}
+
+.chip-soft {
+  background: var(--carbon-wash);
+  border-color: transparent;
+  color: var(--carbon-deep);
+}
+
+.link-strong {
+  font-weight: 650;
+}
+
+.checks-summary {
+  margin: 0;
+  display: grid;
+  gap: 0.35rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--rule);
+}
+
+.check-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-size: 0.9375rem;
+}
+
+.check-row dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--ink-soft);
+}
+
+.check-row dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+.check-row-disputed dd,
+.check-row-disputed dt {
+  color: var(--warn-ink);
+}
+
+.check-row-clear dd {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+/* Status chips for fees and cash counts. */
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+
+.state-paid {
+  color: var(--in);
+}
+
+.state-awaiting,
+.state-partly {
+  color: var(--carbon-deep);
+}
+
+.state-disputed {
+  color: var(--warn-ink);
+}
+
+.state-unpaid {
+  color: var(--out);
+}
+
+.data-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9375rem;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.data-table thead th {
+  font-weight: 650;
+  color: var(--ink-soft);
+  border-bottom: 2px solid var(--carbon);
+  white-space: nowrap;
+}
+
+.data-table tbody th {
+  font-weight: 600;
+}
+
+.data-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.cash-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+}
+
+.cash-tile {
+  display: grid;
+  gap: 0.2rem;
+  align-content: start;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-control);
+}
+
+.cash-figure {
+  font-size: 2rem;
+  font-weight: 700;
+  font-stretch: 80%;
+  line-height: 1.1;
+}
+
+.cash-none {
+  font-size: 1.25rem;
+  color: var(--ink-soft);
+  font-weight: 550;
+}
+
+.activity {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 1rem 0.5rem;
+}
+
+.activity-item {
+  padding: 0.7rem 0 0.7rem 1rem;
+  border-left: 2px solid var(--rule);
+  position: relative;
+}
+
+.activity-item::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: 1.05rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--carbon);
+}
+
+.activity-entry-disputed::before {
+  background: var(--warn-ink);
+}
+
+.activity-summary {
+  overflow-wrap: anywhere;
+}
+
+.activity-meta {
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.card-plain {
+  background: var(--sheet);
+  border-radius: var(--radius-sheet);
+}
+
+.payments {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.payment {
+  background: var(--sheet);
+  border-radius: var(--radius-sheet);
+  padding: 0.9rem 1rem;
+  display: grid;
+  gap: 0.35rem;
+  border-left: 4px solid transparent;
+}
+
+.payment-waiting {
+  border-left-color: var(--margin);
+}
+
+.payment-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.payment-event {
+  font-weight: 650;
+  font-size: 1.0625rem;
+}
+
+.payment-what {
+  color: var(--ink-soft);
+  font-size: 0.9375rem;
+}
+
+.payment-amount {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-stretch: 85%;
+  white-space: nowrap;
+}
+
+.payment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--carbon);
+}
+
+.btn-outline:hover {
+  background: var(--carbon-wash);
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 550;
+  align-self: end;
+  padding-bottom: 0.55rem;
+}
+
+.checkbox input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--carbon);
+}
+
+.field select {
+  font: inherit;
+  color: inherit;
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #b9c2d8;
+  border-radius: var(--radius-control);
+  background: #fff;
+}
+
+.field input[readonly] {
+  background: var(--paper);
+  color: var(--ink-soft);
+}

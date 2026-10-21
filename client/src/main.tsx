@@ -6,8 +6,10 @@ import './styles.css';
 import { AuthProvider } from './auth';
 import { AppShell } from './components/AppShell';
 import { EventPage } from './pages/EventPage';
+import { ActivityPage } from './pages/ActivityPage';
 import { EventsPage } from './pages/EventsPage';
 import { LoginPage } from './pages/LoginPage';
+import { MyPaymentsPage } from './pages/MyPaymentsPage';
 
 function NotFound() {
   return (
@@ -27,6 +29,8 @@ createRoot(document.getElementById('root')!).render(
           <Route element={<AppShell />}>
             <Route index element={<EventsPage />} />
             <Route path="events/:eventId" element={<EventPage />} />
+            <Route path="me/payments" element={<MyPaymentsPage />} />
+            <Route path="activity" element={<ActivityPage />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

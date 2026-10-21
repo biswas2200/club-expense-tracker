@@ -71,4 +71,25 @@ describe('events API', () => {
     await agent.get('/api/events/64b7f0f0f0f0f0f0f0f0f0f0').expect(404);
     await agent.get('/api/events/not-an-id').expect(404);
   });
+
+  it('stores a fee per member, 0 by default', async () => {
+    const { admin } = await createCast();
+    const agent = await loginAs(ctx.app, admin._id);
+    const plain = await agent
+      .post('/api/events')
+      .send({ name: 'Plain', budgetPaise: 100 })
+      .expect(201);
+    expect(plain.body.feePaise).toBe(0);
+    const withFee = await agent
+      .post('/api/events')
+      .send({ name: 'Freshers', budgetPaise: 100, feePaise: 50000 })
+      .expect(201);
+    expect(withFee.body.feePaise).toBe(50000);
+  });
+
+  it.each([[-1], [10.5], ['500']])('rejects a fee of %j', async (feePaise) => {
+    const { admin } = await createCast();
+    const agent = await loginAs(ctx.app, admin._id);
+    await agent.post('/api/events').send({ name: 'Fest', budgetPaise: 100, feePaise }).expect(400);
+  });
 });

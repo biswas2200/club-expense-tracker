@@ -9,6 +9,7 @@ import {
 } from '@nocap/shared';
 import { api } from '../api';
 import { formatPaymentDate, todayInput } from '../format';
+import { useResource } from '../useResource';
 import { Dialog } from './Dialog';
 
 const MAX_PROOF_BYTES = 5 * 1024 * 1024;
@@ -23,9 +24,15 @@ interface EntryFormDialogProps {
 }
 
 export function EntryFormDialog({ eventId, correcting, onClose, onSaved }: EntryFormDialogProps) {
+  const { data: people } = useResource('members', api.members);
+  const payers = (people ?? []).filter((p) => p.role !== 'viewer');
+
   const [direction, setDirection] = useState<Direction>(correcting?.direction ?? 'out');
   const [mode, setMode] = useState<Mode>(correcting?.mode ?? 'upi');
   const [amount, setAmount] = useState(correcting ? paiseToRupeeInput(correcting.amountPaise) : '');
+  const [memberId, setMemberId] = useState(correcting?.member?.id ?? '');
+  const [someoneElse, setSomeoneElse] = useState(Boolean(correcting?.paidBy));
+  const [paidById, setPaidById] = useState(correcting?.paidBy?.id ?? '');
   const [counterparty, setCounterparty] = useState(correcting?.counterparty ?? '');
   const [occurredAt, setOccurredAt] = useState(correcting?.occurredAt.slice(0, 10) ?? todayInput());
   const [txnId, setTxnId] = useState(correcting?.txnId ?? '');
@@ -36,6 +43,7 @@ export function EntryFormDialog({ eventId, correcting, onClose, onSaved }: Entry
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const hintId = useId();
+  const member = payers.find((p) => p.id === memberId);
 
   useEffect(() => {
     if (!proof || !proof.type.startsWith('image/')) return setPreview(null);
@@ -48,10 +56,13 @@ export function EntryFormDialog({ eventId, correcting, onClose, onSaved }: Entry
     const paise = parseRupees(amount);
     if (paise === null) return 'Enter an amount like 1200 or 1,200.50';
     if (paise === 0 && !correcting) return 'Amount must be more than ₹0';
-    if (!counterparty.trim())
-      return direction === 'out' ? 'Say who was paid' : 'Say who the money came from';
+    const party = member ? member.name : counterparty.trim();
+    if (!party) return direction === 'out' ? 'Say who was paid' : 'Say who the money came from';
+    if (someoneElse && member && !paidById) return 'Pick who paid for them';
     if (!occurredAt) return 'Pick the date of the payment';
-    if (!correcting && !proof) return 'Attach a proof: the UPI screenshot, bill photo or receipt';
+    if (!correcting && !proof && mode === 'upi') {
+      return 'Attach a proof: UPI entries need the payment screenshot';
+    }
     if (proof && proof.size > MAX_PROOF_BYTES) return 'Proof must be 5 MB or smaller';
     if (correcting && !reason.trim()) return 'Say why this entry is being corrected';
 
@@ -59,8 +70,10 @@ export function EntryFormDialog({ eventId, correcting, onClose, onSaved }: Entry
     form.set('direction', direction);
     form.set('mode', mode);
     form.set('amountPaise', String(paise));
-    form.set('counterparty', counterparty.trim());
+    form.set('counterparty', party);
     form.set('occurredAt', occurredAt);
+    if (member) form.set('memberId', member.id);
+    if (member && someoneElse && paidById) form.set('paidByMemberId', paidById);
     if (mode === 'upi' && txnId.trim()) form.set('txnId', txnId.trim());
     if (note.trim()) form.set('note', note.trim());
     if (correcting) {
@@ -84,6 +97,14 @@ export function EntryFormDialog({ eventId, correcting, onClose, onSaved }: Entry
       setProblem((err as Error).message);
       setSaving(false);
     }
+  }
+
+  let proofHint = 'UPI screenshot, bill photo or receipt. JPG, PNG, WebP or PDF, up to 5 MB.';
+  if (correcting) proofHint = 'Leave empty to keep the original proof.';
+  else if (mode === 'cash') {
+    proofHint = member
+      ? `Optional for cash: ${member.name} confirms the payment instead.`
+      : 'Optional for cash now, but an admin needs the bill before it can be verified.';
   }
 
   return (
@@ -119,7 +140,7 @@ export function EntryFormDialog({ eventId, correcting, onClose, onSaved }: Entry
             ))}
           </fieldset>
           <fieldset className="segmented">
-            <legend className="field-label">Paid by</legend>
+            <legend className="field-label">Payment method</legend>
             {(['upi', 'cash'] as const).map((value) => (
               <label key={value}>
                 <input
@@ -157,15 +178,66 @@ export function EntryFormDialog({ eventId, correcting, onClose, onSaved }: Entry
           </label>
         </div>
 
+        <div className="field">
+          <label className="field-label" htmlFor={`${hintId}-member`}>
+            Club member <span className="optional">optional</span>
+          </label>
+          <select
+            id={`${hintId}-member`}
+            value={memberId}
+            onChange={(e) => setMemberId(e.target.value)}
+            aria-describedby={`${hintId}-member-hint`}
+          >
+            <option value="">Not a club member</option>
+            {payers.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <span id={`${hintId}-member-hint`} className="field-hint">
+            Pick a member for fees or money paid to a member; they confirm it from My payments.
+          </span>
+        </div>
+
         <label className="field">
           <span className="field-label">{direction === 'out' ? 'Paid to' : 'Received from'}</span>
           <input
-            value={counterparty}
+            value={member ? member.name : counterparty}
             onChange={(e) => setCounterparty(e.target.value)}
+            readOnly={Boolean(member)}
             maxLength={120}
             placeholder={direction === 'out' ? 'Shop or person' : 'Student or sponsor'}
           />
         </label>
+
+        {member && direction === 'in' && (
+          <div className="field-row">
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={someoneElse}
+                onChange={(e) => setSomeoneElse(e.target.checked)}
+              />
+              Someone else paid for them
+            </label>
+            {someoneElse && (
+              <label className="field">
+                <span className="field-label">Paid by</span>
+                <select value={paidById} onChange={(e) => setPaidById(e.target.value)}>
+                  <option value="">Pick a person</option>
+                  {payers
+                    .filter((p) => p.id !== member.id)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            )}
+          </div>
+        )}
 
         {mode === 'upi' && (
           <label className="field">
@@ -213,9 +285,7 @@ export function EntryFormDialog({ eventId, correcting, onClose, onSaved }: Entry
             onChange={(e) => setProof(e.target.files?.[0] ?? null)}
           />
           <span id={hintId} className="field-hint">
-            {correcting
-              ? 'Leave empty to keep the original proof.'
-              : 'UPI screenshot, bill photo or receipt. JPG, PNG, WebP or PDF, up to 5 MB.'}
+            {proofHint}
           </span>
           {preview && (
             <img className="proof-preview" src={preview} alt="Preview of the attached proof" />

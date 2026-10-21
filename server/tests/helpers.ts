@@ -9,7 +9,9 @@ import { createApp } from '../src/app';
 import { Member } from '../src/models/Member';
 import type { Role } from '@nocap/shared';
 
-export { placeholderPng } from '../src/lib/placeholderPng';
+import { placeholderPng } from '../src/lib/placeholderPng';
+
+export { placeholderPng };
 
 const MONGO_URL = process.env.TEST_MONGODB_URL ?? 'mongodb://localhost:27017';
 
@@ -74,4 +76,57 @@ export async function loginAs(app: Express, memberId: unknown) {
     .send({ memberId: String(memberId) })
     .expect(200);
   return agent;
+}
+
+/** Creates an event as the given admin and returns its id. */
+export async function makeEvent(agent: request.Agent, fields: Record<string, unknown> = {}) {
+  const res = await agent
+    .post('/api/events')
+    .send({ name: 'Freshers', budgetPaise: 1_000_000, ...fields })
+    .expect(201);
+  return res.body.id as string;
+}
+
+const OPTIONAL_ENTRY_FIELDS = [
+  'txnId',
+  'note',
+  'correctsEntryId',
+  'reason',
+  'memberId',
+  'paidByMemberId',
+];
+
+/** Posts an entry as multipart, the way the browser does. Pass proof = null for none. */
+export function postEntry(
+  agent: request.Agent,
+  eventId: string,
+  fields: Record<string, string> = {},
+  proof: Buffer | null = placeholderPng(),
+) {
+  const req = agent
+    .post(`/api/events/${eventId}/entries`)
+    .field('direction', fields.direction ?? 'out')
+    .field('mode', fields.mode ?? 'upi')
+    .field('amountPaise', fields.amountPaise ?? '120000')
+    .field('counterparty', fields.counterparty ?? 'Decor Shop')
+    .field('occurredAt', fields.occurredAt ?? '2026-10-14');
+  for (const key of OPTIONAL_ENTRY_FIELDS) {
+    if (fields[key] !== undefined) req.field(key, fields[key]);
+  }
+  if (proof) req.attach('proof', proof, { filename: 'shot.png', contentType: 'image/png' });
+  return req;
+}
+
+/** Confirms or disputes an entry; attaches a bill photo when one is given. */
+export function verify(
+  agent: request.Agent,
+  entryId: string,
+  body: { outcome: string; note?: string },
+  bill?: Buffer,
+) {
+  const req = agent.post(`/api/entries/${entryId}/verifications`);
+  if (!bill) return req.send(body);
+  req.field('outcome', body.outcome);
+  if (body.note) req.field('note', body.note);
+  return req.attach('proof', bill, { filename: 'bill.png', contentType: 'image/png' });
 }

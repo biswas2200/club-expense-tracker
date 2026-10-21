@@ -65,6 +65,8 @@ function EventCard({ event }: { event: EventDTO }) {
         </span>
         <span className="muted">
           {summary.activeEntryCount} {summary.activeEntryCount === 1 ? 'entry' : 'entries'}
+          {summary.unverifiedCount > 0 && `, ${summary.unverifiedCount} not verified`}
+          {summary.disputedCount > 0 && `, ${summary.disputedCount} disputed`}
         </span>
       </p>
     </Link>
@@ -75,6 +77,7 @@ function NewEventDialog({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [budget, setBudget] = useState('');
+  const [fee, setFee] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -83,9 +86,11 @@ function NewEventDialog({ onClose }: { onClose: () => void }) {
     const budgetPaise = parseRupees(budget);
     if (!name.trim()) return setProblem('Give the event a name');
     if (budgetPaise === null) return setProblem('Enter a budget like 25000 or 25,000');
+    const feePaise = fee.trim() ? parseRupees(fee) : 0;
+    if (feePaise === null) return setProblem('Enter a fee like 500, or leave it empty');
     setSaving(true);
     try {
-      const event = await api.createEvent(name.trim(), budgetPaise);
+      const event = await api.createEvent(name.trim(), budgetPaise, feePaise);
       navigate(`/events/${event.id}`);
     } catch (err) {
       setProblem((err as Error).message);
@@ -113,6 +118,20 @@ function NewEventDialog({ onClose }: { onClose: () => void }) {
             inputMode="decimal"
             placeholder="25,000"
           />
+        </label>
+        <label className="field">
+          <span className="field-label">
+            Fee per member (₹) <span className="optional">optional</span>
+          </span>
+          <input
+            value={fee}
+            onChange={(e) => setFee(e.target.value)}
+            inputMode="decimal"
+            placeholder="500"
+          />
+          <span className="field-hint">
+            Each admin and member owes this; the Fees tab shows who has paid.
+          </span>
         </label>
         <div className="form-actions">
           <button type="button" className="btn btn-quiet" onClick={onClose}>
